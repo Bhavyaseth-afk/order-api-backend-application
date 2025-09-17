@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Order Management Service (Core Matching Engine)
+  order-management:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=services.order_management.settings
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    working_dir: /app/services/order_management
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # Trade Service (Data & Read Operations)
+  trade-service:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - DJANGO_SETTINGS_MODULE=services.trade_service.settings
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    working_dir: /app/services/trade_service
+    command: python manage.py runserver 0.0.0.0:8001
+
+  # WebSocket Service (Real-time Updates)
+  websocket-service:
+    build: .
+    ports:
+      - "8002:8002"
+    environment:
+      - DJANGO_SETTINGS_MODULE=services.websocket_service.settings
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: uvicorn services.websocket_service.asgi:application --host 0.0.0.0 --port 8002 --reload
+
+volumes:
+  redis_data:
